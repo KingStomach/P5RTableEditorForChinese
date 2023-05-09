@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
 			else
 			{
 				char* t = reinterpret_cast<char*>(buffer + i);
-				if (t[0]) name.push_back(t[0]);
+				name.push_back(t[0]);
 				if (t[1]) name.push_back(t[1]);
 			}
 		}
