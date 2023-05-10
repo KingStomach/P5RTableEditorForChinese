@@ -1,67 +1,30 @@
-#include <map>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
+#include "CharacterReader.h"
+#include "ChatNameReader.h"
+#include "ChatIconReader.h"
+#include <string>
+
+const std::string character_path("character.txt");
+const std::string chat_titleName_table("chatTitleName.ctd");
+const std::string chat_data_table("chatDataTable.ctd");
 
 int main(int argc, char* argv[])
 {
-	std::ifstream in;
-	in.open("character.txt", std::ios::in);
-	if (!in.is_open())
-	{
-		std::cout << "character.txt" << " open failed." << std::endl;
-		return 0;
-	}
+	CharacterReader character_reader(character_path);
+	character_reader.read();
 
-	std::map<uint16_t, std::string> char_map;
+	ChatNameReader chat_name_reader(chat_titleName_table, std::move(character_reader).getData());
+	chat_name_reader.read();
+	auto chatNames = std::move(chat_name_reader).getData();
 
-	while (!in.eof())
-	{
-		std::string word[2];
-		uint16_t num;
-		in >> word[0];
-		in >> word[1];
-		std::stringstream ss;
-		ss << std::hex << word[1];
-		ss >> num;
-		char* t = reinterpret_cast<char*>(&num);
-		std::swap(t[0], t[1]);
-		char_map.emplace(std::make_pair(num, word[0]));
-	}
-	
-	in.close();
-	in.open("chatTitleName.ctd", std::ios::in | std::ios::binary);
-	std::vector<std::string> chatNames;
-	uint16_t buffer[32];
-	in.seekg(48);
-	while (!in.eof())
-	{
-		in.read(reinterpret_cast<char*>(&buffer), sizeof(buffer));
-		std::string name;
-		for (int i = 0; i < 32; i++)
-		{
-			if (buffer[i] == 0)
-				continue;
-			auto iter = char_map.find(buffer[i]);
-			if (iter != char_map.end())
-				name += char_map[buffer[i]];
-			else
-			{
-				char* t = reinterpret_cast<char*>(buffer + i);
-				name.push_back(t[0]);
-				if (t[1]) name.push_back(t[1]);
-			}
-		}
-		int tt = chatNames.size();
-		chatNames.emplace_back(name);
-	}
+	ChatIconReader icon_reader(chat_data_table);
+	icon_reader.read();
+	auto chat_icons = std::move(icon_reader).getData();
 
 	std::ofstream out;
-	out.open("out.txt", std::ios::out);
-	for (auto& name : chatNames)
+	out.open("icon.txt", std::ios::out);
+	for (auto& icon : chat_icons)
 	{
-		out << name << '\n';
+		out << std::to_string(icon) << '\n';
 	}
 	out.close();
 	return 0;

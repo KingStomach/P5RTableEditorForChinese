@@ -4,4 +4,6 @@ project(P5RTableEditorForChinese) # 设置项目名
 set (CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(${PROJECT_NAME} main.cpp)
+include_directories("${PROJECT_SOURCE_DIR}/include")
+
+add_executable(${PROJECT_NAME} main.cpp "source/ChatNameReader.cpp" "source/CharacterReader.cpp" "source/ChatIconReader.cpp")
