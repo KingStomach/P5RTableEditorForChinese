@@ -1,30 +1,21 @@
-#include "CharacterReader.h"
-#include "ChatNameReader.h"
-#include "ChatIconReader.h"
-#include <string>
+#include "ChatLibraryReader.h"
+#include "ChatReader.h"
 
 const std::string character_path("character.txt");
+const std::string icon_path("icon.txt");
 const std::string chat_titleName_table("chatTitleName.ctd");
 const std::string chat_data_table("chatDataTable.ctd");
 
+
 int main(int argc, char* argv[])
 {
-	CharacterReader character_reader(character_path);
-	character_reader.read();
-
-	ChatNameReader chat_name_reader(chat_titleName_table, std::move(character_reader).getData());
-	chat_name_reader.read();
-	auto chatNames = std::move(chat_name_reader).getData();
-
-	ChatIconReader icon_reader(chat_data_table);
-	icon_reader.read();
-	auto chat_icons = std::move(icon_reader).getData();
-
+	auto library = ChatLibraryReader(character_path, icon_path).readData();
+	auto chats = ChatReader(chat_titleName_table, chat_data_table, library).readData();
 	std::ofstream out;
-	out.open("icon.txt", std::ios::out);
-	for (auto& icon : chat_icons)
+	out.open("out.txt", std::ios::out);
+	for (auto& chat : chats)
 	{
-		out << std::to_string(icon) << '\n';
+		out << chat.name << '\t' << chat.icon << '\n';
 	}
 	out.close();
 	return 0;

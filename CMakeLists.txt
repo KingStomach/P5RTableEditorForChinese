@@ -6,4 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories("${PROJECT_SOURCE_DIR}/include")
 
-add_executable(${PROJECT_NAME} main.cpp "source/ChatNameReader.cpp" "source/CharacterReader.cpp" "source/ChatIconReader.cpp")
+add_executable(${PROJECT_NAME} main.cpp
+	"source/ChatLibrary.cpp"
+	"source/ChatLibraryReader.cpp"
+	"source/ChatReader.cpp"
+	"source/CTDReader.cpp")
