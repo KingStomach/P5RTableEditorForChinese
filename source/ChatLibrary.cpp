@@ -11,21 +11,23 @@ P5RChat ChatLibrary::decode(const std::vector<uint8_t>& encode_name, const std::
 	std::string decode_name;
 	std::string decode_icon;
 
-	for (int i = 0; i < encode_name.size(); i += 2)
+	int i = 0;
+	while (i < encode_name.size())
 	{
 		if (encode_name[i] == 0)
 			break;
-		uint16_t key = (static_cast<uint16_t>(encode_name[i]) << 8) + static_cast<unsigned char>(encode_name[i + 1]);
-		auto iter = std::lower_bound(m_characters.cbegin(), m_characters.cend(), key, 
-			[](const auto& zPair, auto key) { return zPair.first < key; });
-		if (iter != m_characters.end() && iter->first == key)
-			decode_name += iter->second;
+		if (isascii(encode_name[i]))
+			decode_name += encode_name[i++];
 		else
 		{
-			//decode_name.push_back(encode_name[i]);
-			//if (encode_name[i + 1]) decode_name.push_back(encode_name[i + 1]);
-			decode_name += std::format("{:x}", key);
-			//decode_name += ss.str();
+			uint16_t key = (static_cast<uint16_t>(encode_name[i]) << 8) + static_cast<unsigned char>(encode_name[i + 1]);
+			i += 2;
+			auto iter = std::lower_bound(m_characters.cbegin(), m_characters.cend(), key,
+				[](const auto& zPair, auto key) { return zPair.first < key; });
+			if (iter != m_characters.end() && iter->first == key)
+				decode_name += iter->second;
+			else
+				decode_name += std::format("{:x}", key);
 		}
 	}
 
