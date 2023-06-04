@@ -4,98 +4,130 @@
 #include <type_traits>
 #include <string>
 #include <vector>
+#include "Chat.h"
+#include "CTD.h"
 
-template <class Derived>
-class IReader
+template <class IStream>
+std::vector<std::string> readByWord(IStream&& stream)
 {
-public:
-	IReader() = default;
-	virtual ~IReader() = default;
+	std::vector<std::string> res;
+	for (std::string word; stream >> word;)
+		res.emplace_back(word);
+	return res;
+}
 
-	auto readData() { return static_cast<Derived*>(this)->readImpl(); }
-};
-
-template <class Derived>
-class IStreamReader : public IReader<IStreamReader<Derived>>, protected std::ifstream
+template <class IStream, class Fn>
+std::vector<typename std::invoke_result<Fn, std::string>::type> readByWord(IStream&& stream, Fn&& fn)
 {
-public:
-	IStreamReader(const std::string& filename, ios_base::openmode mode = ios_base::in)
-		: IReader<IStreamReader<Derived>>(), std::ifstream(filename, mode) {}
-	virtual ~IStreamReader() = default;
+	decltype(readByWord(stream, fn)) res;
+	std::string word;
+	while (stream >> word)
+		res.emplace_back(fn(word));
+	return res;
+}
 
-protected:
-	friend class IReader<IStreamReader<Derived>>;
-	auto readImpl() { return static_cast<Derived*>(this)->readImpl(); }
-};
-
-template <class Derived>
-class IStreamStrReader : public IStreamReader<IStreamStrReader<Derived>>
+template <class IStream>
+std::vector<std::string> readByLine(IStream&& stream)
 {
-public:
-	IStreamStrReader(const std::string& filename)
-		: IStreamReader<IStreamStrReader<Derived>>(filename, std::ios::in) {}
-	virtual ~IStreamStrReader() = default;
+	std::vector<std::string> res;
+	for (std::string line; std::getline(stream, line);)
+		res.emplace_back(line);
+	return res;
+}
 
-protected:
-	friend class IStreamReader<IStreamStrReader<Derived>>;
-	auto initData() const { return static_cast<const Derived*>(this)->initDataImpl(); }
-	auto handleToken(const std::string& line, auto& res) const { return static_cast<const Derived*>(this)->handleTokenImpl(line, res); }
-	auto readImpl();
-};
-
-template <class Derived>
-auto IStreamStrReader<Derived>::readImpl()
+template <class IStream, class Fn>
+std::vector<typename std::invoke_result<Fn, std::string>::type> readByLine(IStream&& stream, Fn&& fn)
 {
+	decltype(readByWord(stream, fn)) res;
 	std::string line;
-	auto res = this->initData();
-	while (!this->eof())
-	{
-		std::getline(*this, line);
-		this->handleToken(line, res);
-	}
-
+	for (std::string line; std::getline(stream, line);)
+		res.emplace_back(fn(line));
 	return res;
 }
 
-template <class Derived>
-class IStreamBinReader :public IStreamReader<IStreamBinReader<Derived>>
+class ChatLibraryReader final
 {
 public:
-	IStreamBinReader(const std::string& filename)
-		: IStreamReader<IStreamBinReader<Derived>>(filename, std::ios::in | std::ios::binary) {}
-	virtual ~IStreamBinReader() = default;
+	ChatLibraryReader() = delete;
 
-protected:
-	auto getHeadToken() { return static_cast<Derived*>(this)->getHeadTokenImpl(); }
-	void getToken(std::vector<uint8_t>& token) { static_cast<Derived*>(this)->getTokenImpl(token); }
-	auto getEndToken() { static_cast<Derived*>(this)->getEndTokenImpl(); }
+	template <class IStream>
+	static ChatLibrary read(IStream&& nameStream, IStream&& iconStream)
+	{
+		auto characters = readByLine(nameStream, [](const std::string& token)
+			{
+				uint16_t num;
+				std::stringstream ss;
+				auto pos = token.rfind('\t');
+				ss << std::hex << token.substr(0, pos);
+				ss >> num;
+				uint32_t ch = 0;
+				for (int i = pos + 1; i < token.length(); i++)
+				{
+					ch <<= 8;
+					ch |= static_cast<uint8_t>(token[i]);
+				}
+				return std::make_pair(num, ch);
+			});
+		auto icons = readByLine(iconStream, [](const std::string& token)
+			{
+				uint16_t num;
+				std::stringstream ss;
+				auto pos = token.rfind('\t');
+				ss << std::hex << token.substr(0, pos);
+				ss >> num;
+				return std::make_pair(static_cast<uint8_t>(num), token.substr(pos + 1));
+			});
 
-	auto initData() const { return static_cast<const Derived*>(this)->initDataImpl(); }
-	std::pair<uint32_t, uint32_t> handleHeadToken(const auto& head) const { return static_cast<const Derived*>(this)->handleHeadTokenImpl(head); }
-	void handleToken(const std::vector<uint8_t>& token, auto& res) { static_cast<Derived*>(this)->handleTokenImpl(token, res); }
-	void handleEndToken(const auto& end) { return static_cast<Derived*>(this)->handleEndTokenImpl(end); }
-
-	auto readImpl();
-
-	void getEndTokenImpl() {}
-	friend class IStreamReader<IStreamBinReader<Derived>>;
+		return ChatLibrary(std::move(characters), std::move(icons));
+	}
 };
 
-template <class Derived>
-auto IStreamBinReader<Derived>::readImpl()
+class CTDReader final
 {
-	auto [size, num] = this->handleHeadToken(getHeadToken());
-	auto res = this->initData();
+public:
+	CTDReader() = delete;
 
-	std::vector<uint8_t> token(size);
-	for (size_t i = 0; i < num; i++)
+	template <class IStream>
+	static CTD read(IStream&& stream)
 	{
-		this->getToken(token);
-		this->handleToken(token, res);
+		CTD::Head head;
+		stream.read(reinterpret_cast<char*>(head.data()), head.size());
+
+		uint32_t total_data_size = (head[36] << 24) + (head[37] << 16) + (head[38] << 8) + head[39];
+		uint32_t total_num = (head[40] << 24) + (head[41] << 16) + (head[42] << 8) + head[43];
+
+		std::vector<CTD::Data> datas;
+		for (int i = 0; i < total_num; i++)
+		{
+			CTD::Data data(total_data_size / total_num, -1);
+			if (!stream.read(reinterpret_cast<char*>(data.data()), total_data_size / total_num))
+				break;
+			datas.emplace_back(std::move(data));
+		}
+
+		CTD::End end;
+		stream.read(reinterpret_cast<char*>(end.data()), end.size());
+
+		return CTD(std::move(head), std::move(datas), std::move(end));
 	}
+};
 
-	if constexpr (!std::is_void<decltype(this->getEndToken())>::value)
-		this->handleHeadToken(getEndToken());
+class ChatReader
+{
+public:
+	ChatReader() = delete;
 
-	return res;
-}
+	template <class IStream>
+	static std::vector<Chat> read(IStream&& nameStream, IStream&& iconStream, const ChatLibrary& library)
+	{
+		auto names = CTDReader::read(nameStream).decode(std::bind(&ChatLibrary::decodeName, &library, std::placeholders::_1));
+		auto icons = CTDReader::read(iconStream).decode([](const auto& icon) -> uint8_t { return icon[1]; });
+
+		std::vector<Chat> res;
+		for (int i = 0; i < names.size(); i++)
+		{
+			res.emplace_back(Chat(std::move(names[i]), icons[i]));
+		}
+		return res;
+	}
+};

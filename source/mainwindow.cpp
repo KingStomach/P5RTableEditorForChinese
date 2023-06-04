@@ -1,8 +1,8 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
-
-#include "ChatLibraryReader.h"
-#include "ChatReader.h"
+#include "ChatLibrary.h"
+#include "IReader.h"
+#include <QComboBox>
 
 const std::string character_path("character.txt");
 const std::string icon_path("icon.txt");
@@ -11,17 +11,29 @@ const std::string chat_data_table("chatDataTable.ctd");
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
-    , ui(new Ui::MainWindow)
+    , ui(new Ui::MainWindow), m_library(std::make_unique<ChatLibrary>(ChatLibraryReader::read(std::ifstream(character_path), std::ifstream(icon_path))))
 {
     ui->setupUi(this);
-    auto library = ChatLibraryReader(character_path, icon_path).readData();
-    auto chats = ChatReader(chat_titleName_table, chat_data_table, library).readData();
+    auto chats = ChatReader::read(std::ifstream(chat_titleName_table, std::ios::binary), std::ifstream(chat_data_table, std::ios::binary), *m_library);
     ui->tableWidget->setRowCount(chats.size());
-    for (int i = 0; i < chats.size();i++)
+
+    for (int i = 0; i < chats.size(); i++)
     {
-        ui->tableWidget->setItem(i, 0, new QTableWidgetItem(QString::fromStdString(chats[i].icon)));
+        addCombobox(m_library->getIconList(), i, chats[i].idxIcon);
         ui->tableWidget->setItem(i, 1, new QTableWidgetItem(QString::fromStdString(chats[i].name)));
     }
+    int y = 0;
+}
+
+void MainWindow::addCombobox(const std::vector<std::pair<uint8_t, std::string>>& icons, int row, int idxIcon)
+{
+    QComboBox* combox = new QComboBox();
+    for (int i = 0; i < icons.size(); i++)
+    {
+        combox->insertItem(i, QString::fromStdString(icons[i].second), QVariant::fromValue(icons[i].first));
+    }
+    ui->tableWidget->setCellWidget(row, 0, combox);
+    combox->setCurrentIndex(combox->findData(idxIcon));
 }
 
 MainWindow::~MainWindow()

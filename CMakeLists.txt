@@ -17,9 +17,6 @@ add_executable(${PROJECT_NAME}
 	"form/mainwindow.ui"
 	"include/mainwindow.h"
 	"source/ChatLibrary.cpp"
-	"source/ChatLibraryReader.cpp"
-	"source/ChatReader.cpp"
-	"source/CTDReader.cpp"
 	"source/mainwindow.cpp"
 )
 

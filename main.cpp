@@ -8,17 +8,6 @@ const std::string chat_data_table("chatDataTable.ctd");
 
 int main(int argc, char* argv[])
 {
-	/*
-	auto library = ChatLibraryReader(character_path, icon_path).readData();
-	auto chats = ChatReader(chat_titleName_table, chat_data_table, library).readData();
-	std::ofstream out;
-	out.open("out.txt", std::ios::out);
-	for (auto& chat : chats)
-	{
-		out << chat.name << '\t' << chat.icon << '\n';
-	}
-	out.close();*/
-
 	QApplication a(argc, argv);
 	MainWindow w;
 	w.show();
