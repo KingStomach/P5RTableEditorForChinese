@@ -61,11 +61,7 @@ public:
 				ss << std::hex << token.substr(0, pos);
 				ss >> num;
 				uint32_t ch = 0;
-				for (int i = pos + 1; i < token.length(); i++)
-				{
-					ch <<= 8;
-					ch |= static_cast<uint8_t>(token[i]);
-				}
+				token.copy(reinterpret_cast<char*>(&ch), token.length() - pos, pos + 1);
 				return std::make_pair(num, ch);
 			});
 		auto icons = readByLine(iconStream, [](const std::string& token)
@@ -105,6 +101,8 @@ public:
 			datas.emplace_back(std::move(data));
 		}
 
+		int offset = (head[8] << 24) + (head[9] << 16) + (head[10] << 8) + head[11];
+		stream.seekg(offset);
 		CTD::End end;
 		stream.read(reinterpret_cast<char*>(end.data()), end.size());
 
@@ -117,11 +115,10 @@ class ChatReader
 public:
 	ChatReader() = delete;
 
-	template <class IStream>
-	static std::vector<Chat> read(IStream&& nameStream, IStream&& iconStream, const ChatLibrary& library)
+	static std::vector<Chat> read(const CTD& nameTable, const CTD& iconTable, const ChatLibrary& library)
 	{
-		auto names = CTDReader::read(nameStream).decode(std::bind(&ChatLibrary::decodeName, &library, std::placeholders::_1));
-		auto icons = CTDReader::read(iconStream).decode([](const auto& icon) -> uint8_t { return icon[1]; });
+		auto names = nameTable.decode(std::bind(&ChatLibrary::decodeName, &library, std::placeholders::_1));
+		auto icons = iconTable.decode([](const auto& icon) -> uint8_t { return icon[1]; });
 
 		std::vector<Chat> res;
 		for (int i = 0; i < names.size(); i++)

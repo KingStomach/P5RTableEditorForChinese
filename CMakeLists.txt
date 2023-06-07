@@ -18,6 +18,6 @@ add_executable(${PROJECT_NAME}
 	"include/mainwindow.h"
 	"source/ChatLibrary.cpp"
 	"source/mainwindow.cpp"
-)
+ "include/IWriter.h")
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt5::Widgets)

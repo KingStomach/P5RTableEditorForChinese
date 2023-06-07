@@ -33,14 +33,8 @@ std::string ChatLibrary::decodeName(const std::vector<uint8_t>& encode_name) con
 			auto iter = std::lower_bound(m_characters.cbegin(), m_characters.cend(), key,
 				[](const auto& zPair, auto key) { return zPair.first < key; });
 			if (iter != m_characters.end() && iter->first == key)
-			{
-				for (int i = 3; i >= 0; i--)
-				{
-					uint8_t ch = iter->second >> (i * 8);
-					if (!ch) continue;
-					decode_name.push_back(ch);
-				}
-			}
+				//decode_name.append((char*)&iter->second);
+				decode_name.append(reinterpret_cast<const char*>(&iter->second));
 			else
 				decode_name += std::format("{:x}", key);
 		}
@@ -58,21 +52,25 @@ std::string ChatLibrary::decodeIcon(uint8_t idxIcon) const
 std::vector<uint8_t> ChatLibrary::encodeName(const std::string& name) const
 {
 	std::vector<uint8_t> res;
-	for (auto iter = name.begin(); iter != name.end(); iter++)
+	int i = 0;
+	while (i < name.size())
 	{
-		if (isascii(*iter))
-			res.emplace_back(*iter);
-		else if (iter + 1 == name.end())
+		if (isascii(name[i]))
+			res.emplace_back(name[i++]);
+		else if (name.size() - i < 2)
 			break;
 		else
 		{
-			uint16_t key = (static_cast<uint16_t>(*iter) << 8) + static_cast<unsigned char>(*(iter + 1));
+			uint32_t key = 0;
+			name.copy(reinterpret_cast<char*>(&key), 3, i);
+			i += 3;
 			auto iter = std::lower_bound(m_characters.cbegin(), m_characters.cend(), key,
 				[](const auto& zPair, auto key) { return zPair.second < key; });
 			if (iter != m_characters.end() && iter->second == key)
 			{
-				res.emplace_back(iter->first >> 8);
-				res.emplace_back(iter->first);
+				const uint8_t* p = reinterpret_cast<const uint8_t*>(&iter->first);
+				res.emplace_back(*(p + 1));
+				res.emplace_back(*p);
 			}
 		}
 	}
